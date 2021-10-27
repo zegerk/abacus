@@ -34,7 +34,7 @@ function setup() {
   let params = getURLParams();
 
   Object.keys(config).reduce(function(key) {
-    config[key] = params[key] || config[key]
+    (typeof params[key] != undefined) && (config[key] = params[key])
   });
   
   let bitCount = count;
