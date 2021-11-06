@@ -1,12 +1,6 @@
-html, body {
-  margin: 0;
-  padding: 0;
-}
-canvas {
-  display: block;
-}
-
-button.control {
-  width: 50px;
-  height: 50px;
+html,
+body {
+	margin: 0;
+	padding: 0;
+	font-family: sans-serif;
 }
