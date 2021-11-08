@@ -1,15 +1,19 @@
 /**
  * Abacus
+ *
+ * https://gist.github.com/sixhat/5bcf3b8d159e7285e247a96c1cbf055f
  */
 let bit = [];
 
+let canvas;
+let canvasCb;
 let myFont;
-let rightPressed = false;
 
 let TEXT_SIZE_BASE = 30;
 let TEXT_SIZE_COUNT = 50;
 
 let ROW_SPACING = 150;
+let activeBead = false;
 
 let config = {
   showCount: true,
@@ -36,6 +40,10 @@ function preload() {
     return bytes.buffer;
   }
   
+	/**
+	 * Load the font through a base64 encoded var to avoid
+	 * issues with loading an external resource
+	 */
   var rawFont = _base64ToArrayBuffer(kronaOneBase64);
 
   var font = opentype.parse(rawFont);
@@ -47,6 +55,9 @@ function preload() {
   myFont.font = font;
 }
 
+/**
+ * Helper functions
+ */
 substract = function() {       
 	if (config.count > 0) {
 		bit[0]--;
@@ -61,34 +72,118 @@ add = function() {
 	} 
 }
 
-function setup() {
-  //console.log(this);
-	/*
-	https://github.com/msawired/OPC
+class _p5 {
+	static createCanvas() {
+		canvas = createCanvas(...arguments);
+		
+		canvasCb = createGraphics(...arguments);
+		//canvasCb.show();
+		//canvasCb.style("display", "inline");
+	}
 	
-	OPC.slider('count', 10, 1, 100,1);
+	static pixelDensity() {
+		canvasCb.pixelDensity(...arguments);
+		return pixelDensity(...arguments);
+	}
+	
+	static orbitControl() {
+		canvasCb.orbitControl(...arguments);
+		return orbitControl(...arguments);
+	}
+	
+	static fillBead() { 
+		let beadConfig = arguments[0];
+		
+		canvasCb.fill(beadConfig.bitIdx, beadConfig.beadIdx, 0); 
+		return fill([...arguments].slice(1));
+	}
+	
+	static cylinder() { canvasCb.cylinder(...arguments); return cylinder(...arguments);	}
+	static torus() { canvasCb.torus(...arguments); return torus(...arguments);	}
+	static fill() { canvasCb.fill(...arguments); return fill(...arguments);	}
+	static noStroke() { canvasCb.noStroke(...arguments); return noStroke(...arguments);	}
+	
+	static push() { canvasCb.push(...arguments); return push(...arguments); }
+	static pop() { canvasCb.pop(...arguments); return pop(...arguments); }
+	static translate() { canvasCb.translate(...arguments); return translate(...arguments); }
+	static rotateX() { canvasCb.rotateX(...arguments); return rotateX(...arguments); }
+	static rotateY() { canvasCb.rotateY(...arguments); return rotateY(...arguments); }
+	static rotateZ() { canvasCb.rotateZ(...arguments); return rotateZ(...arguments); }
+	static scale() { canvasCb.scale(...arguments); return scale(...arguments); }
+}
 
-		
-	window.addEventListener("message", (event) => {
-		count = parseInt(JSON.parse(event.data.message).value);
-		updateBeads();
-	}, '*');
-	*/
+function getObject(mx, my) {
+	if (mx > width || my > height) {
+		return 0;
+	}
+
+	var gl = canvasCb.elt.getContext('webgl');
+	var pix = getPixels();
+
+	var index = 4 * ((gl.drawingBufferHeight - my) * gl.drawingBufferWidth + mx);
+
+	/**
+	 * should not happen ...
+	 */
+	if (typeof pix[index + 0] == 'undefined') {
+		return 0;
+	}
 	
-		
-	canvas = createCanvas(window.innerWidth - 4, window.innerHeight - 4, WEBGL);
-  textFont(myFont);
-  textSize(120);  
+	var cor = color(
+		pix[index + 0],
+		pix[index + 1],
+		pix[index + 2]
+	);
+  return cor;
+}
+
+/* This function loads the pixels of the color buffer canvas into an array 
+		called pixels and returns them. */
+function getPixels() {
+	var gl = canvasCb.elt.getContext('webgl');
+	var pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+	gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+	return (pixels);
+}
+
+function updateBeads() {
+	/**
+	 * Overflow, happens when dynamically reducing bits
+	 * @todo set overflow flag 
+	 */
+	if (config.count >= config.base ** config.bits) {
+		config.count = config.base ** config.bits - 1;
+	}
 	
-  
-  let params = getURLParams();
+	let bitCount = config.count;
+	
+	/**
+   * Setup the bits according to count given
+   */
+  for (var i = config.bits - 1; i > -1; i--) {
+    bit[i] = Math.floor(bitCount / (config.base ** i));
+    
+    bitCount -= bit[i] * (config.base ** i);
+  }
+}
+
+function setup() {
+	let params = getURLParams();
 
   Object.keys(config).forEach((key) => {
     (typeof params[key] != 'undefined') && (config[key] = params[key]);
   }, []);
-  
+		
+	
+	_p5.createCanvas(window.innerWidth - 4, window.innerHeight - 4, WEBGL);
+	//_p5.createCanvas(500, 500, WEBGL);
+  _p5.pixelDensity(1);
+	
+  textFont(myFont);
+  textSize(120);  
+
 	/**
-	 * Controls
+	 * Slider controls and checkboxes
 	 */
 	let controlsConfig = {
 		bits: { label: 'Bits', min: 1, max: 16, default: config.bits, step: 1 },
@@ -156,26 +251,6 @@ function setup() {
 	updateBeads();
 }
 
-function updateBeads() {
-	/**
-	 * Overflow, happens when dynamically reducing bits
-	 */
-	if (config.count >= config.base ** config.bits) {
-		config.count = config.base ** config.bits - 1;
-	}
-	
-	let bitCount = config.count;
-	
-	/**
-   * Setup the bits according to count given
-   */
-  for (var i = config.bits - 1; i > -1; i--) {
-    bit[i] = Math.floor(bitCount / (config.base ** i));
-    
-    bitCount -= bit[i] * (config.base ** i);
-  }
-}
-
 function keyTyped() {
   if (key == "+") {
     add();
@@ -185,11 +260,28 @@ function keyTyped() {
 }
 
 function draw() {
+	let colorIdx = 0;
+	let mouseObj = getObject(mouseX, mouseY);
+	
+	activeBead = false;
+	
   background(255);
   ambientLight(60, 60, 60);
   pointLight(255, 255, 255, 0, 0, 100);
 
-  orbitControl();
+  _p5.orbitControl();
+	
+	/**
+	 * Sync
+	 */
+	let camera = this._renderer._curCamera;
+	canvasCb.clear();
+	canvasCb.background(128,128,128);
+	canvasCb.camera(
+		camera.eyeX, camera.eyeY, camera.eyeZ,
+		camera.centerX, camera.centerY, camera.centerZ,
+		camera.upX, camera.upY, camera.upZ,
+	);
 
   /**
    * The "engine"
@@ -214,146 +306,172 @@ function draw() {
    */
 	let height = ROW_SPACING * config.bits;
 	
-	// minimal space, space per bead, final cylinder piece sticking out o
+	// minimal space, space per bead, final cylinder piece sticking out
 	let width = 120 + config.base * 45 + 40;
 	
-	scale(Math.min(window.innerHeight / height, window.innerWidth / width));
+	_p5.scale(Math.min(window.innerHeight / height, window.innerWidth / width));
 	
-	translate(-width / 2, -height / 2, -height);
+	_p5.translate(-width / 2, -height / 2, -height);
   
   /**
    * Draw generic information on the top
    */
-  push();
+  _p5.push();
     if (config.showCount) {
-      push();
-        translate(0, -150, 0);
-        fill(255, 0, 0, 255);
+      _p5.push();
+        _p5.translate(0, -150, 0);
+        _p5.fill(255, 0, 0, 255);
         textSize(TEXT_SIZE_COUNT);  
         text("Count " + config.count, 0, 0);
-      pop();
+      _p5.pop();
     }
 
-    translate(config.base * 45 - 85, -150, 0);
+    _p5.translate(config.base * 45 - 85, -150, 0);
     if (config.showBase) {
-      push();
-        fill(0, 0, 0, 255);
+      _p5.push();
+        _p5.fill(0, 0, 0, 255);
         textSize(TEXT_SIZE_BASE);
         text("Base " + config.base, 300, 0);
-      pop();
-      translate(250, 0, 0);
+      _p5.pop();
+      _p5.translate(250, 0, 0);
     }
 
     if (config.showBaseCount) {
-      push();
-        fill(0, 0, 0, 255);
+      _p5.push();
+        _p5.fill(0, 0, 0, 255);
         textSize(TEXT_SIZE_BASE);
         text("Base count " + (config.count.toString(config.base)), 300, 0);
-      pop();
+      _p5.pop();
     }
-  pop();
+  _p5.pop();
 
   /**
    * Draw the rows
    */
-	let colorIdx = 0;
-	
-  for (var bitIdx = 0; bitIdx < config.bits; bitIdx++) {  
+  for (var bitIdx = 0; bitIdx < config.bits; bitIdx++) {
+		
+		colorIdx++;
+		/**
+		 * Bit shifts because it is possible, using
+		 * colorIdx > 7 && (colorIdx -= 7); also works
+		 */
+		colorIdx -= 7 * ( colorIdx >> 3 );
+		
     /**
      * Draw the number of beads shifted 
      */
     if (config.showBeadCount) {
-      push();
-        translate(-180, 45, 0);
-        fill(0);
+      _p5.push();
+        _p5.translate(-180, 45, 0);
+        _p5.fill(0);
         textSize(120);
         text(bit[bitIdx], 0, 0);
-      pop();
+      _p5.pop();
     }
 
     /**
      * Draw the base count information on right side of row
      */
-    push();
-      translate(120 + config.base * 45 + 100, 15, 0);
+    _p5.push();
+      _p5.translate(120 + config.base * 45 + 100, 15, 0);
     
       if (config.showBasePowers) {
-        push();
-          fill(0);
+        _p5.push();
+          _p5.fill(0);
           textSize(TEXT_SIZE_BASE);
           text(config.base ** bitIdx, 0, 0);
-        pop();
-        translate(250, 0, 0);
+        _p5.pop();
+        _p5.translate(250, 0, 0);
       }
     
       if (config.showBeadRowSum) {
-        push();
-          fill(0);
+        _p5.push();
+          _p5.fill(0);
           textSize(TEXT_SIZE_BASE);
           text(bit[bitIdx] + " x " + config.base ** bitIdx + " = " + (bit[bitIdx] * config.base ** bitIdx), 0, 0);
-        pop();
+        _p5.pop();
       }
-    pop();
+    _p5.pop();
     
 
-    push();
-      noStroke();
-    	colorIdx++;
-		  /**
-			 * Bit shifts because it is possible, using
-			 * colorIdx > 7 && (colorIdx -= 7); also works
-			 */
-			colorIdx -= 7 * ( colorIdx >> 3 );
-		
+    _p5.push();
+      _p5.noStroke();
+    
       /**
        * Draw the "stick" for the beads
        */
-      push();
-        rotateZ(PI / 2);
-        translate(0, -width / 2);
-        fill(!!(colorIdx & 1) * 164, !!(colorIdx & 2) * 164, !!(colorIdx & 4) * 164);
+      _p5.push();
+        _p5.rotateZ(PI / 2);
+        _p5.translate(0, -width / 2);
+			  fill(!!(colorIdx & 1) * 144, !!(colorIdx & 2) * 144, !!(colorIdx & 4) * 144);
 		
         cylinder(25, width, 24, 16);
-      pop();
+      _p5.pop();
 
-      translate(0, 0, 0);
-      rotateZ(0);
-      rotateX(0);
-      rotateY(PI / 2);
+      _p5.translate(0, 0, 0);
+      _p5.rotateZ(0);
+      _p5.rotateX(0);
+      _p5.rotateY(PI / 2);
 
       /**
+			 * @todo : merge blocks, lots of duplicate code here
+			 *
        * Draw the "active" beads
        */
-      beads = 0;
-			fill(!!(colorIdx & 1) * 255, !!(colorIdx & 2) * 255, !!(colorIdx & 4) * 255);
-      for (; beads < bit[bitIdx]; beads++) {
-        translate(0, 0, 45);
-        torus(40, 20, 24, 16);
+      beadIdx = 0;
+			for (; beadIdx < bit[bitIdx]; beadIdx++) {
+				_p5.fillBead({bitIdx, beadIdx}, !!(colorIdx & 1) * 235, !!(colorIdx & 2) * 235, !!(colorIdx & 4) * 235);
+				if (mouseObj != 0 && mouseObj.levels[0] == bitIdx && mouseObj.levels[1] == beadIdx) {
+					activeBead = {bitIdx, beadIdx};
+					fill(255,255,255);
+				} 
+				
+      	_p5.translate(0, 0, 45);
+        _p5.torus(40, 20, 24, 16);
       }
 
       /**
        * Space between the active and non active beads
        */
-      translate(0, 0, 120);
+      _p5.translate(0, 0, 120);
 
       /**
        * Draw the non-active beads
        */
-			fill(!!(colorIdx & 1) * 200, !!(colorIdx & 2) * 200, !!(colorIdx & 4) * 200);
-      for (; beads < config.base; beads++) {
-        translate(0, 0, 45);
-        torus(40, 20, 24, 16);
+			for (; beadIdx < config.base; beadIdx++) {
+				_p5.fillBead({bitIdx, beadIdx}, !!(colorIdx & 1) * 200, !!(colorIdx & 2) * 200, !!(colorIdx & 4) * 200);
+				if (mouseObj != 0 && mouseObj.levels[0] == bitIdx && mouseObj.levels[1] == beadIdx) {
+					activeBead = {bitIdx, beadIdx};
+					fill(255,255,255);
+				} 
+				
+      	_p5.translate(0, 0, 45);
+        _p5.torus(40, 20, 24, 16);
       }
     
-    pop();
+    _p5.pop();
     
     /**
      * Move to new row
      */
-    translate(0, ROW_SPACING, 0);
+    _p5.translate(0, ROW_SPACING, 0);
 
   }
 
+}
+
+function mouseClicked() {
+  if (activeBead) {
+		/**
+		 * Compute the value of the bead being moved
+		 */
+		let value = parseInt( config.base ** activeBead.bitIdx * ( activeBead.beadIdx - bit[activeBead.bitIdx] + (activeBead.beadIdx >= bit[activeBead.bitIdx]) ) );
+		
+		
+		//bit[activeBead.bitIdx]
+		config.count += value;
+		updateBeads();
+  }
 }
 
 /**
