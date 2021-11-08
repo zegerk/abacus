@@ -319,7 +319,7 @@ function draw() {
   _p5.push();
     if (config.showCount) {
       _p5.push();
-        _p5.translate(0, -150, 0);
+        _p5.translate(0, -200, 0);
         _p5.fill(255, 0, 0, 255);
         textSize(TEXT_SIZE_COUNT);  
         text("Count " + config.count, 0, 0);
@@ -400,6 +400,9 @@ function draw() {
       /**
        * Draw the "stick" for the beads
        */
+		  normalMaterial();
+			shininess(0);
+		
       _p5.push();
         _p5.rotateZ(PI / 2);
         _p5.translate(0, -width / 2);
@@ -417,7 +420,10 @@ function draw() {
 			 * @todo : merge blocks, lots of duplicate code here
 			 *
        * Draw the "active" beads
-       */
+       */	
+			specularMaterial(128, 128);
+			shininess(50);
+		
       beadIdx = 0;
 			for (; beadIdx < bit[bitIdx]; beadIdx++) {
 				_p5.fillBead({bitIdx, beadIdx}, !!(colorIdx & 1) * 235, !!(colorIdx & 2) * 235, !!(colorIdx & 4) * 235);
