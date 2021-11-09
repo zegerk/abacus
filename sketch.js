@@ -344,6 +344,24 @@ function draw() {
       _p5.pop();
     }
   _p5.pop();
+	
+	/**
+	 * Side bars
+	 */
+	_p5.push();
+	 	fill(128, 128, 128);
+	
+		translate(-25, height / 2 - 50, 0);
+		box(50, height + 50, 100);
+	
+		_p5.push();
+			translate(width + 50, 0, 0);
+			box(50, height + 50, 100);
+		_p5.pop();
+	
+		translate(width / 2 + 25, height / 2 + 50, 0);
+	  box(width + 150, 50, 200);
+	_p5.pop();
 
   /**
    * Draw the rows
@@ -362,7 +380,7 @@ function draw() {
      */
     if (config.showBeadCount) {
       _p5.push();
-        _p5.translate(-180, 45, 0);
+        _p5.translate(-220, 45, 0);
         _p5.fill(0);
         textSize(120);
         text(bit[bitIdx], 0, 0);
@@ -373,7 +391,7 @@ function draw() {
      * Draw the base count information on right side of row
      */
     _p5.push();
-      _p5.translate(120 + config.base * 45 + 100, 15, 0);
+      _p5.translate(120 + config.base * 45 + 120, 15, 0);
     
       if (config.showBasePowers) {
         _p5.push();
