@@ -1,6 +1,7 @@
 /**
  * Abacus
  *
+ * 
  * https://gist.github.com/sixhat/5bcf3b8d159e7285e247a96c1cbf055f
  */
 let bit = [];
@@ -27,9 +28,14 @@ let config = {
   count: 1234,
 }
 
+let pane;
+
 function preload() {
   //myFont = loadFont('KronaOne-Regular.ttf');
   
+	/**
+	 * Helper function to load font
+	 */
   function _base64ToArrayBuffer(base64) {
     var binary_string = window.atob(base64);
     var len = binary_string.length;
@@ -46,37 +52,39 @@ function preload() {
 	 */
   var rawFont = _base64ToArrayBuffer(kronaOneBase64);
 
-  var font = opentype.parse(rawFont);
-  
   /**
    * Hack to inject the base64 loaded font into the p5 font object
    */
   myFont = new p5.Font(p5.prototype.loadFont);
-  myFont.font = font;
+  myFont.font = opentype.parse(rawFont);
 }
 
 /**
  * Helper functions
  */
-substract = function() {       
+let substract = function() {       
 	if (config.count > 0) {
 		bit[0]--;
 		config.count--;
 	} 
 }
 
-add = function() {       
+let add = function() {       
 	if (config.count < config.base ** config.bits - 1) {
 		bit[0]++;
 		config.count++;
 	} 
 }
 
+/**
+ * Wrapper to handle two canvasses at the same time
+ */
 class _p5 {
 	static createCanvas() {
 		canvas = createCanvas(...arguments);
 		
 		canvasCb = createGraphics(...arguments);
+		// Debug
 		//canvasCb.show();
 		//canvasCb.style("display", "inline");
 	}
@@ -112,6 +120,9 @@ class _p5 {
 	static scale() { canvasCb.scale(...arguments); return scale(...arguments); }
 }
 
+/**
+ * Get bead at mouse pointer
+ */
 function getObject(mx, my) {
 	if (mx > width || my > height) {
 		return 0;
@@ -146,6 +157,9 @@ function getPixels() {
 	return (pixels);
 }
 
+/**
+ * Called when count is updated
+ */
 function updateBeads() {
 	/**
 	 * Overflow, happens when dynamically reducing bits
@@ -170,61 +184,43 @@ function updateBeads() {
 function setup() {
 	let params = getURLParams();
 
+	_p5.createCanvas(window.innerWidth - 4, window.innerHeight - 4, WEBGL);
+	//_p5.createCanvas(500, 500, WEBGL);
+  _p5.pixelDensity(1);
+		
+	textFont(myFont);
+  textSize(120);  
+	
   Object.keys(config).forEach((key) => {
     (typeof params[key] != 'undefined') && (config[key] = params[key]);
   }, []);
 		
-	
-	_p5.createCanvas(window.innerWidth - 4, window.innerHeight - 4, WEBGL);
-	//_p5.createCanvas(500, 500, WEBGL);
-  _p5.pixelDensity(1);
-	
-  textFont(myFont);
-  textSize(120);  
-
 	/**
-	 * Slider controls and checkboxes
+	 * Setup control pane
 	 */
-	let controlsConfig = {
-		bits: { label: 'Bits', min: 1, max: 16, default: config.bits, step: 1 },
-		base: { label: 'Base', min: 2, max: 16, default: config.base, step: 1 },
-		count: { label: 'Count', min: 0, max: 100000, default: config.count, step: 1 },
-	}
-	let offsetY = 10;
-	let textBox = [];
-	let slider = [];
+	pane = new Tweakpane.Pane();
 	
-	Object.entries(controlsConfig).forEach(([variable, variableConfig]) => {	
-		offsetY += 30;
-		
-		let label = createDiv(variableConfig.label);
-		label.position(30, offsetY); 
-
-		textBox[variable] = createInput('');
-		textBox[variable].size(50);
-		textBox[variable].parent(label);
-		textBox[variable].input(
-			debounce(() => {
-				config[variable] = textBox[variable].value();
-				slider[variable].value(textBox[variable].value());
-				updateBeads();
-			}, 250)
-		);
-
-		slider[variable] = createSlider(variableConfig.min, variableConfig.max, variableConfig.default, variableConfig.step);
-		slider[variable].parent(label);
-		slider[variable].input((event) => {
-			config[variable] = slider[variable].value();
-			textBox[variable].value(slider[variable].value());
-			updateBeads();
-		});
-
-		textBox[variable].value(slider[variable].value());
-	})
+	const rootPane = pane.addFolder({
+		title: 'Press + or - to add or substract'
+	});
+	
+	const controlPane = rootPane.addFolder({
+  	title: 'Controls',
+  	expanded: true,   // optional
+	});
+	
+	controlPane.addInput(config, 'bits',  {min: 1, max: 16, step: 1}).on('change', updateBeads);
+	controlPane.addInput(config, 'base',  {min: 2, max: 16, step: 1}).on('change', updateBeads);
+	controlPane.addInput(config, 'count',  {min: 0, max: 1000000, step: 1}).on('change', updateBeads);
 	
   /**
    * Buttons to switch on extra visualisations
    */
+	const textPane = rootPane.addFolder({
+  	title: 'Text',
+  	expanded: false,   // optional
+	});
+	
 	controlsConfig = {
 		showBase: { label: 'Base' },
 		showBaseCount: { label: 'Base count' },
@@ -233,19 +229,9 @@ function setup() {
 		showBeadRowSum: { label: 'Bead row sum' },
 		showCount: { label: 'Count' },
 	}
-	
-	let buttons = createDiv();
-	buttons.position(10, 10); 
-	
-	let offsetX = 0;
-	
-	Object.entries(controlsConfig).forEach(([variable, variableConfig]) => {	
-		offsetX += 100;
-		
-		let button = createButton(variableConfig.label).addClass('control').mouseClicked(function() {       
-    	config[variable] = !config[variable];
-  	});
-		button.parent(buttons);
+
+	Object.entries(controlsConfig).forEach(([variable, variableConfig]) => {		
+		textPane.addInput(config, variable, { label: variableConfig.label } );
 	});
 	
 	updateBeads();
@@ -359,6 +345,7 @@ function draw() {
 			box(50, height + 50, 100);
 		_p5.pop();
 	
+		fill(133, 94, 66);
 		translate(width / 2 + 25, height / 2 + 50, 0);
 	  box(width + 150, 50, 200);
 	_p5.pop();
@@ -489,26 +476,12 @@ function mouseClicked() {
 		/**
 		 * Compute the value of the bead being moved
 		 */
-		let value = parseInt( config.base ** activeBead.bitIdx * ( activeBead.beadIdx - bit[activeBead.bitIdx] + (activeBead.beadIdx >= bit[activeBead.bitIdx]) ) );
-		
-		
-		//bit[activeBead.bitIdx]
-		config.count += value;
+		config.count += parseInt( 
+			config.base ** activeBead.bitIdx * 
+			( activeBead.beadIdx - bit[activeBead.bitIdx] + (activeBead.beadIdx >= bit[activeBead.bitIdx]) ) 
+		);
 		updateBeads();
   }
-}
-
-/**
- * https://www.joshwcomeau.com/snippets/javascript/debounce/
- */
-const debounce = (callback, wait) => {
-  let timeoutId = null;
-  return (...args) => {
-    window.clearTimeout(timeoutId);
-    timeoutId = window.setTimeout(() => {
-      callback.apply(null, args);
-    }, wait);
-  };
 }
 
 /**
