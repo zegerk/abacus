@@ -192,7 +192,7 @@ function setup() {
   textSize(120);  
 	
   Object.keys(config).forEach((key) => {
-    (typeof params[key] != 'undefined') && (config[key] = params[key]);
+    (typeof params[key] != 'undefined') && (config[key] = parseInt(params[key]));
   }, []);
 		
 	/**
